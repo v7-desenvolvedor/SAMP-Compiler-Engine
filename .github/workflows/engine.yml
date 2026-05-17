@@ -1,0 +1,62 @@
+name: Motor Compilador SA-MP Mobile (Sem Token)
+
+on:
+  workflow_dispatch:
+    inputs:
+      zip_url:
+        description: 'Link público do arquivo .zip da source code'
+        required: true
+      apk_name:
+        description: 'Nome final do APK'
+        required: false
+        default: 'SAMP_Client'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Baixar a Source Code do Usuário
+      run: |
+        echo "Baixando o arquivo da source code enviado via link..."
+        curl -L -o source.zip "${{ github.event.inputs.zip_url }}"
+        
+        echo "Descompactando os arquivos..."
+        unzip source.zip -d projeto_SAMP
+        
+        # Move os arquivos para a raiz do workspace para o compilador achar
+        mv projeto_SAMP/* . || true
+
+    - name: Configurar Java JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Configurar Android SDK e NDK
+      uses: android-actions/setup-android@v3
+
+    - name: Dar permissão de execução ao Gradle
+      run: |
+        if [ -f "gradlew" ]; then
+          chmod +x gradlew
+        else
+          echo "ERRO: Arquivo gradlew não foi encontrado na raiz do .zip!" && exit 1
+        fi
+
+    - name: Compilar o APK (Release)
+      run: ./gradlew assembleRelease
+
+    - name: Criar Link de Download do APK Pronto
+      run: |
+        APK_PATH=$(find app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
+        if [ -z "$APK_PATH" ]; then
+          echo "ERRO: O APK não foi gerado com sucesso." && exit 1
+        fi
+        
+        echo "Fazendo upload do APK para servidor temporário público..."
+        # Faz o upload do APK para o transfer.sh e exibe o link na tela
+        LINK_FINAL=$(curl --upload-file "$APK_PATH" https://transfer.sh/${{ github.event.inputs.apk_name }}.apk)
+        echo "=============================================="
+        echo "DOWNLOAD_URL: $LINK_FINAL"
+        echo "=============================================="
