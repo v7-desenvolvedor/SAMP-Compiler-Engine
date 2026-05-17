@@ -1,3 +1,4 @@
+
 name: Motor Compilador SA-MP Mobile (Sem Token)
 
 on:
@@ -7,7 +8,7 @@ on:
         description: 'Link público do arquivo .zip da source code'
         required: true
       apk_name:
-        description: 'Nome final do APK'
+        description: 'Nome final do APK (Ex: Meu_SAMP)'
         required: false
         default: 'SAMP_Client'
 
@@ -56,14 +57,34 @@ jobs:
 
     - name: Criar Link de Download do APK Pronto
       run: |
-        APK_PATH=$(find app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
-        if [ -z "$APK_PATH" ]; then
+        ORIGINAL_APK=$(find app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
+        if [ -z "$ORIGINAL_APK" ]; then
           echo "ERRO: O APK não foi gerado com sucesso." && exit 1
         fi
         
-        echo "Fazendo upload do APK para servidor de download direto..."
-        # Usando Litterbox: gera link direto .apk que força o download no navegador
-        LINK_FINAL=$(curl -s -F "reqtype=fileupload" -F "time=24h" -F "fileToUpload=@$APK_PATH" https://litterbox.catbox.moe/user/api.php)
+        # Define o nome do APK com base no input do usuário
+        APK_NAME="${{ github.event.inputs.apk_name }}"
+        if [ -z "$APK_NAME" ]; then
+          APK_NAME="SAMP_Client"
+        fi
+        
+        # Remove a extensão .apk do input se o usuário já tiver digitado com ela
+        APK_NAME=$(echo "$APK_NAME" | sed 's/\.apk$//')
+        
+        APK_PATH="app/build/outputs/apk/release/${APK_NAME}.apk"
+        
+        # Renomeia o APK gerado
+        mv "$ORIGINAL_APK" "$APK_PATH"
+        
+        echo "Obtendo o melhor servidor do Gofile..."
+        SERVER=$(curl -s https://api.gofile.io/servers | grep -oE '"name":"[^"]+"' | head -n 1 | cut -d'"' -f4)
+        if [ -z "$SERVER" ]; then
+          SERVER="store3"
+        fi
+        
+        echo "Fazendo upload do APK para o Gofile (Ilimitado)..."
+        RESPONSE=$(curl -s -F "file=@$APK_PATH" https://${SERVER}.gofile.io/contents/uploadfile)
+        LINK_FINAL=$(echo "$RESPONSE" | grep -oE '"downloadPage":"[^"]+"' | cut -d'"' -f4)
 
         echo "=============================================="
         echo "DOWNLOAD_URL: $LINK_FINAL"
