@@ -20,25 +20,18 @@ jobs:
       run: |
         echo "Detectando e baixando o arquivo da source code..."
         
-        # Se o link for do MediaFire, extrai o link direto de dentro do HTML de forma automática
         if [[ "${{ github.event.inputs.zip_url }}" == *"mediafire.com"* ]]; then
-          echo "Link do MediaFire detectado. Extraindo link direto de download..."
           REAL_URL=$(curl -sL "${{ github.event.inputs.zip_url }}" | grep -oE 'https://download[^"]+\.zip' | head -n 1)
         else
           REAL_URL="${{ github.event.inputs.zip_url }}"
         fi
         
         if [ -z "$REAL_URL" ]; then
-          echo "ERRO: Não foi possível extrair o link real. Certifique-se de que o arquivo é público." && exit 1
+          echo "ERRO: Não foi possível extrair o link real." && exit 1
         fi
         
-        echo "Link real de download: $REAL_URL"
         curl -L -o source.zip "$REAL_URL"
-        
-        echo "Descompactando os arquivos..."
         unzip source.zip -d projeto_SAMP
-        
-        # Move os arquivos para a raiz do workspace para o compilador achar
         mv projeto_SAMP/* . || true
 
     - name: Configurar Java JDK 17
@@ -55,7 +48,7 @@ jobs:
         if [ -f "gradlew" ]; then
           chmod +x gradlew
         else
-          echo "ERRO: Arquivo gradlew não foi encontrado na raiz do .zip!" && exit 1
+          echo "ERRO: Arquivo gradlew não foi encontrado!" && exit 1
         fi
 
     - name: Compilar o APK (Release)
@@ -68,14 +61,9 @@ jobs:
           echo "ERRO: O APK não foi gerado com sucesso." && exit 1
         fi
         
-        echo "Fazendo upload do APK para servidor temporário público alternativo..."
-        # Faz o upload usando o bashupload (Osh.at) que é estável e rápido
-        LINK_FINAL=$(curl -X POST https://osh.at/u/ -F "file=@$APK_PATH" | grep -oE 'https://osh.at/[A-Za-z0-9]+' | head -n 1)
-        
-        if [ -z "$LINK_FINAL" ]; then
-           # Alternativa secundária caso o principal falhe na hora
-           LINK_FINAL=$(curl -F "file=@$APK_PATH" https://file.io)
-        fi
+        echo "Fazendo upload do APK para servidor de download direto..."
+        # Usando Litterbox: gera link direto .apk que força o download no navegador
+        LINK_FINAL=$(curl -s -F "reqtype=fileupload" -F "time=24h" -F "fileToUpload=@$APK_PATH" https://litterbox.catbox.moe/user/api.php)
 
         echo "=============================================="
         echo "DOWNLOAD_URL: $LINK_FINAL"
