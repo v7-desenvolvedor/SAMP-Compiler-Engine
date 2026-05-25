@@ -85,18 +85,18 @@ jobs:
       - name: Setup Gradle Cache
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-disabled: false
+          cache-disabled: true
 
       # 5. Cache do NDK para compilação C/C++ rápida
-      - name: Cache C/C++ Build (NDK)
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.android/ccache
-            .cxx
-          key: ${{ runner.os }}-ndk-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ndk-
+     # - name: Cache C/C++ Build (NDK)
+     #   uses: actions/cache@v4
+     #   with:
+     #     path: |
+     #       ~/.android/ccache
+     #       .cxx
+     #     key: ${{ runner.os }}-ndk-${{ github.sha }}
+     #     restore-keys: |
+     #       ${{ runner.os }}-ndk-
 
       # 6. Compilação do APK com tratamento de log para o Bot
       - name: Compilar APK (Debug)
