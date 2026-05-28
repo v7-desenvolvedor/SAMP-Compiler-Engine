@@ -8,7 +8,7 @@ on:
         required: true
         type: string
 
-# Força o ambiente moderno do GitHub Actions (Sgme os avisos do Node 20)
+# Força o ambiente moderno do GitHub Actions
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -60,7 +60,8 @@ jobs:
           mkdir -p temp_extract
           unzip -q source.zip -d temp_extract
           
-          PROJECT_ROOT=$(find temp_extract -type f \( -name "gradlew" -o -name "build.gradle" \) | head -n 1 | xargs -I {} dirname "{}")
+          # CORREÇÃO: Busca a pasta raiz do projeto de forma precisa
+          PROJECT_ROOT=$(find temp_extract -maxdepth 3 \( -name "gradlew" -o -name "build.gradle" -o -name "build.gradle.kts" \) | head -n 1 | xargs -I {} dirname "{}")
           if [ -z "$PROJECT_ROOT" ]; then
             echo "::error::[ERRO ESTRUTURAL] Nenhum projeto Gradle encontrado no ZIP!"
             exit 1
@@ -74,42 +75,31 @@ jobs:
           rm -rf temp_extract source.zip
           echo "=============================================="
 
-      # 3. Configuração do Java moderno (Node 24 compatível)
+      # 3. Configuração do Java moderno (Alterado para Temurin para evitar Erro 520)
       - name: Configurar JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      # 4. Cache do Gradle atualizado para v4 (Evita falhas de cache da Microsoft)
+      # 4. Cache do Gradle atualizado para v4
       - name: Setup Gradle Cache
         uses: gradle/actions/setup-gradle@v4
         with:
           cache-disabled: true
 
-      # 5. Cache do NDK para compilação C/C++ rápida
-     # - name: Cache C/C++ Build (NDK)
-     #   uses: actions/cache@v4
-     #   with:
-     #     path: |
-     #       ~/.android/ccache
-     #       .cxx
-     #     key: ${{ runner.os }}-ndk-${{ github.sha }}
-     #     restore-keys: |
-     #       ${{ runner.os }}-ndk-
-
-      # 6. Compilação do APK com tratamento de log para o Bot
+      # 5. Compilação do APK
       - name: Compilar APK (Debug)
         id: gradle_build
         run: |
           echo "Iniciando compilação do Gradle..."
           ./gradlew assembleDebug --stacktrace --no-daemon
 
-      # 7. Localizar o APK gerado automaticamente
+      # 6. Localizar o APK gerado automaticamente (Melhorado o escopo de busca)
       - name: Localizar APK Gerado
         if: success()
         run: |
-          APK_PATH=$(find app/build/outputs/apk/debug/ -type f -name "*.apk" | head -n 1)
+          APK_PATH=$(find . -type f -path "*/build/outputs/apk/debug/*.apk" | head -n 1)
           if [ -z "$APK_PATH" ]; then
             echo "::error::[ERRO] APK compilou mas o arquivo não foi encontrado!"
             exit 1
@@ -117,7 +107,7 @@ jobs:
           echo "APK_FOUND=$APK_PATH" >> $GITHUB_ENV
           echo "Encontrado em: $APK_PATH"
 
-      # 8. Upload do arquivo para os servidores do GitHub
+      # 7. Upload do arquivo para os servidores do GitHub
       - name: Upload do APK
         if: success()
         uses: actions/upload-artifact@v4
